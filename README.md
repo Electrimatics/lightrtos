@@ -1,5 +1,5 @@
 # LightAVRKernel
-A lightweight kernel for the AVR architecture.  Very much a WIP and experiment.  Being designed around the Arduino Uno and Mega boards.
+A light-weight RTOS for an 8-bit AVR SOC.  Using the Arduino Nano/Mega as development targets.  Currently a WIP.
 
 ## Inspiration and Resources
 - TinyRealTime Kernel from Cornell: https://people.ece.cornell.edu/land/courses/ece4760/RTOS/TinyRealTime.pdf

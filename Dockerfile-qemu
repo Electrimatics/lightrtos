@@ -8,7 +8,7 @@ RUN (cd /qemu && ./configure --target-list=avr-softmmu --prefix=/opt/qemu && mak
 FROM debian:13-slim as lightrtos-qemu-runner
 ENV PATH=${PATH}:/opt/qemu/bin
 COPY --from=lightrtos-qemu-build /opt/qemu /opt/qemu
-RUN apt update && apt install -y gdb-multiarch libglib2.0-dev lxterminal netcat-traditional telnet
+RUN apt update && apt install -y gdb-multiarch libglib2.0-dev lxterminal telnet
 COPY qemu-container/entrypoint.sh /entrypoint.sh
 RUN DEBIAN_FRONTEND=noninteractive apt update && apt install -y gdb-multiarch libglib2.0-dev lxterminal telnet
 ENTRYPOINT ["/entrypoint.sh"]

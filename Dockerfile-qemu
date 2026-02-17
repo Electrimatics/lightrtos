@@ -1,10 +1,14 @@
 # Build target
 FROM debian:13-slim AS lightrtos-qemu-build
-ENV DEBIAN_FRONTEND=noninteractive
-
 COPY qemu/ /qemu
-COPY container/qemu-select-firmware.sh /qemu-select-firmware.sh
+RUN DEBIAN_FRONTEND=noninteractive apt update && apt install -y build-essential git libglib2.0-dev meson ninja-build python3 python3-venv
+RUN (cd /qemu && ./configure --target-list=avr-softmmu --prefix=/opt/qemu && make -j $(nproc) && make install)
 
-RUN apt update && apt install -y build-essential git libglib2.0-dev meson ninja-build python3 python3-venv
-RUN (cd /qemu && ./configure --target-list=avr-softmmu && make -j $(nproc))
-ENTRYPOINT ["/qemu-select-firmware.sh"]
+# Runner target
+FROM debian:13-slim as lightrtos-qemu-runner
+ENV PATH=${PATH}:/opt/qemu/bin
+COPY --from=lightrtos-qemu-build /opt/qemu /opt/qemu
+RUN apt update && apt install -y gdb-multiarch libglib2.0-dev lxterminal netcat-traditional telnet
+COPY qemu-container/entrypoint.sh /entrypoint.sh
+RUN DEBIAN_FRONTEND=noninteractive apt update && apt install -y gdb-multiarch libglib2.0-dev lxterminal telnet
+ENTRYPOINT ["/entrypoint.sh"]

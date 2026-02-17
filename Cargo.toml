@@ -3,7 +3,7 @@ name = "lightrtos"
 version = "0.1.0"
 authors = ["Henry C. Budris <henry.budris@gmail.com>"]
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [[bin]]
 name = "lightrtos"

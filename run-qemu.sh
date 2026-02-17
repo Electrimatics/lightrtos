@@ -1,26 +1,39 @@
 #!/bin/bash
+CONTAINER_MANAGER="docker"
 CONTAINER_IMAGE="lightrtos-qemu-runner:latest"
+HOST_DEPENDENCIES=("git" "xhost" "$CONTAINER_MANAGER")
 
 usage() {
-    echo "$0 <-d|--debug> <-t|--telnet>"
-    echo "  -d|--debug: Auto-start GDB and connect to the emulator"
-    echo "  -t|--telnet: Auto-start telnet and connect to the emulator (USART interface)"
+    echo "$0 <-h|--help> <--build-container> <--no-telnet> <--no-debug>"
+    echo "  -h|--help: Shows this help message."
+    echo "  --build-container: Force build a new container."
+    echo "  --no-telnet: Do not auto-start telnet inside the container connected to USART. Will be available on port 10000."
+    echo "  --no-debug: Do not auto-start gdb-multiarch inside the container. Will be available on port 10001."
 }
 
 cleanup() {
-    if [ ! -z $TELNET_PID ]; then
-        kill $TELNET_PID
-    fi
-
-    if [ ! -z $GDB_PID ]; then
-        kill $GDB_PID
-    fi
+    :
 }
 trap cleanup "EXIT"
 
+# missing_dependencies=""
+# for dependency in $HOST_DEPENDENCIES; do
+#     if ! $(which $dependency); then
+#         missing_dependencies+=$dependency
+#     fi
+# done
+
+# if $missing_dependencies; then
+#     echo "Missing host dependencies: $missing_dependencies"
+#     exit 1
+# fi
+
 # Parse args
-START_DEBUG=0
-START_TELNET=0
+BUILD_CONTAINER=0
+START_TELNET=1
+START_DEBUG=1
+
+DOCKER_RUN_ARGS=""
 QEMU_RUN_ARGS=""
 # Parse options
 while [ $# -gt 0 ]; do
@@ -29,30 +42,33 @@ while [ $# -gt 0 ]; do
             usage
             exit 0
             ;;
-        -d|--debug)
-            START_DEBUG=1
-            QEMU_RUN_ARGS+="-gdb tcp::10001 -S"
+        --build-container)
+            BUILD_CONTAINER=1
             shift
             ;;
-        -t|--telnet)
-            START_TELNET=1
+        --no-telnet)
+            START_TELNET=0
+            shift
+            ;;
+        --no-debug)
+            START_DEBUG=0
             shift
             ;;
         *)
-            echo "Unknown option -- $0"
+            echo "$0 Unknown option -- $1"
             shift
             ;;
     esac
 done
 
-# Check if docker image is already built
-echo "Checking for existing image with QEMU"
-if [ -z $(docker images -q $CONTAINER_IMAGE 2>/dev/null) ]; then
-    echo "No image found. Building."
+# Check if image is already built (or force build specified)
+if [[ -z $($CONTAINER_MANAGER images -q $CONTAINER_IMAGE 2>/dev/null) || $BUILD_CONTAINER -ne 0 ]]; then
+    echo "Building container image: $CONTAINER_IMAGE"
 
     git submodule update --init
     (cd qemu && git submodule update --init)
-    docker build --rm -f Dockerfile-qemu --tag $CONTAINER_IMAGE .
+    # $CONTAINER_MANAGER image rmi $CONTAINER_IMAGE 2>/dev/null
+    $CONTAINER_MANAGER build --rm -f Dockerfile-qemu --tag $CONTAINER_IMAGE .
 fi
 
 # TODO: Make this a script arg?
@@ -93,27 +109,14 @@ if [[ -z $REPLY || -z $firmware_image_abs ]]; then
 fi
 
 echo "Select firmware image $REPLY: $firmware_image_abs"
-
-# TODO: Figure out a better way to debug and connect with telnet
-# We are heavily relying on sleeping 3 and 5 seconds to make things work
-# Telnet must be connected in before GDB
-TELNET_PID=0
-if [ $START_TELNET -ne 0 ]; then
-    lxterminal --title "QEMU USART" -e "source utils.sh; wait_for_port 10000; sleep 3; \
-        telnet localhost 10000;" &
-    TELNET_PID=$!
-fi
-
-GDB_PID=0
-if [ $START_DEBUG -ne 0 ]; then
-    # TODO: Add ability to pass GDB file in
-    lxterminal --title "QEMU DEBUG" -e "source utils.sh; wait_for_port 10001; sleep 5; \
-        gdb -iex 'set remotetimeout unlimited' \
-        -iex 'set architecture avr' \
-        -iex 'symbol-file $firmware_image_abs' \
-        -iex 'target remote localhost:10001'" &
-    GDB_PID=$!
-fi
-
 echo "Running container $CONTAINER_IMAGE with args $QEMU_RUN_ARGS"
-docker run --rm -it -p 10000-10001:10000-10001 -v $firmware_image_abs:/firmware.img $CONTAINER_IMAGE $QEMU_RUN_ARGS
+xhost +
+$CONTAINER_MANAGER run --rm -it \
+    -p 10000-10001:10000-10001 \
+    -e DISPLAY=$DISPLAY \
+    -e START_TELNET=$START_TELNET \
+    -e START_DEBUG=$START_DEBUG \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $firmware_image_abs:/firmware.img \
+    -v $(pwd)/src:/src \
+    $CONTAINER_IMAGE $QEMU_RUN_ARGS

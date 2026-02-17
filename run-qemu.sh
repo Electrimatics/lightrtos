@@ -1,5 +1,5 @@
 #!/bin/bash
-CONTAINER_MANAGER="docker"
+CONTAINER_MANAGER="${CONTAINER_MANAGER:-docker}"
 CONTAINER_IMAGE="lightrtos-qemu-runner:latest"
 HOST_DEPENDENCIES=("git" "xhost" "$CONTAINER_MANAGER")
 
@@ -9,6 +9,9 @@ usage() {
     echo "  --build-container: Force build a new container."
     echo "  --no-telnet: Do not auto-start telnet inside the container connected to USART. Will be available on port 10000."
     echo "  --no-debug: Do not auto-start gdb-multiarch inside the container. Will be available on port 10001."
+    echo ""
+    echo " Environment variables:"
+    echo "  CONTAINER_MANAGER: Set container manager (docker or podman recommended). Default: docker"
 }
 
 cleanup() {
@@ -28,13 +31,13 @@ trap cleanup "EXIT"
 #     exit 1
 # fi
 
-# Parse args
 BUILD_CONTAINER=0
 START_TELNET=1
 START_DEBUG=1
 
 DOCKER_RUN_ARGS=""
 QEMU_RUN_ARGS=""
+
 # Parse options
 while [ $# -gt 0 ]; do
     case $1 in
@@ -72,28 +75,26 @@ if [[ -z $($CONTAINER_MANAGER images -q $CONTAINER_IMAGE 2>/dev/null) || $BUILD_
 fi
 
 # TODO: Make this a script arg?
-# Enumerate firmware images
-firmware_dir="./firmware"
-images=($(ls $firmware_dir))
-num_images=${#images[@]}
-min_valid_selection=1
-max_valid_selection=$(($num_images+1))
+FIRMWARE_DIR="./firmware"
+FIRMWARE_IMAGES=($(ls $FIRMWARE_DIR))
+NUM_FIRMWARE_IMAGES=${#FIRMWARE_IMAGES[@]}
+MIN_VALID_SELECTION=1
+MAX_VALID_SELECTION=$(($NUM_FIRMWARE_IMAGES+1))
 
 # Prompt for image selection
-echo "Select a firmware image from directory $firmware_dir:"
-PS3="[$min_valid_selection-$max_valid_selection] > "
-select opt in "${images[@]}" "Quit"; do
+echo "Select a firmware image from directory $FIRMWARE_DIR:"
+PS3="[$MIN_VALID_SELECTION-$MAX_VALID_SELECTION] > "
+select opt in "${FIRMWARE_IMAGES[@]}" "Quit"; do
     case "$REPLY" in
     # Quit case
-    $(($num_images+1)))
-        echo "Exiting"
+    $(($NUM_FIRMWARE_IMAGES+1)))
         exit 0
         ;;
 
     # Any other input - we provide additional validation afterwards
     *)
-        if [[ $REPLY -lt $min_valid_selection || $REPLY -gt $max_valid_selection ]]; then
-            echo "Invalid selection -- valid range: [$min_valid_selection-$max_valid_selection]"
+        if [[ $REPLY -lt $MIN_VALID_SELECTION || $REPLY -gt $MAX_VALID_SELECTION ]]; then
+            echo "Invalid selection -- out of range"
             continue
         fi
         break
@@ -102,13 +103,13 @@ select opt in "${images[@]}" "Quit"; do
 done
 
 # Double check a firmware image was elected (ie: sending EOF will close the above prompt w/o selecting an image)
-firmware_image_abs=$(readlink -f $firmware_dir/${images[$(($REPLY-1))]})
-if [[ -z $REPLY || -z $firmware_image_abs ]]; then
+FIRMWARE_IMAGE_ABS=$(readlink -f $FIRMWARE_DIR/${FIRMWARE_IMAGES[$(($REPLY-1))]})
+if [[ -z $REPLY || -z $FIRMWARE_IMAGE_ABS ]]; then
     echo "No firmware image selected. Exiting"
     exit 1
 fi
 
-echo "Select firmware image $REPLY: $firmware_image_abs"
+echo "Select firmware image $REPLY: $FIRMWARE_IMAGE_ABS"
 echo "Running container $CONTAINER_IMAGE with args $QEMU_RUN_ARGS"
 xhost +
 $CONTAINER_MANAGER run --rm -it \
@@ -117,6 +118,6 @@ $CONTAINER_MANAGER run --rm -it \
     -e START_TELNET=$START_TELNET \
     -e START_DEBUG=$START_DEBUG \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -v $firmware_image_abs:/firmware.img \
+    -v $FIRMWARE_IMAGE_ABS:/firmware.img \
     -v $(pwd)/src:/src \
     $CONTAINER_IMAGE $QEMU_RUN_ARGS

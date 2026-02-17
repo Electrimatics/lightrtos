@@ -1,5 +1,5 @@
 #!/bin/bash
-# START_TELNET, START_DEBUG, QEMU_RUN_ARGS populated by docker run command
+# START_TELNET, START_DEBUG, QEMU_RUN_ARGS populated by docker run command (using -e flag)
 
 if [ $START_TELNET -ne 0 ]; then
     lxterminal --title "QEMU USART" -e "until kill -0 $(pidof qemu-system-avr); do : ; done; sleep 1; telnet localhost 10000;" &
@@ -15,6 +15,7 @@ if [ $START_DEBUG -ne 0 ]; then
         -iex 'target remote :10001'" &
 fi
 
+# TODO: Need to manually continue to have input accepted on USART over telnet
+QEMU_RUN_ARGS="-nographic -monitor stdio -machine arduino-uno -serial tcp::10000,server,wait=on -bios /firmware.img $QEMU_RUN_ARGS"
 echo "Running QEMU with args: $QEMU_RUN_ARGS"
-# TODO: Need to manually continue to have input accepted
-qemu-system-avr -nographic -monitor stdio -machine arduino-uno -serial tcp::10000,server,wait=on -bios /firmware.img $QEMU_RUN_ARGS
+qemu-system-avr $QEMU_RUN_ARGS

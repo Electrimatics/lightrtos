@@ -12,6 +12,7 @@ A light-weight RTOS for an 8-bit AVR SOC.  Using the Arduino Nano/Mega as develo
 We are utilizing QEMU v10.2.1 (pinned as a submodule) to setup an emulated development environment.  There is a helper script, `run-qemu.sh`, that will update the QEMU submodule, build and deploy QEMU from source in a container (docker or podman), named `lightrtos-qemu-runner`, and run QEMU with a provided binary file.  You will be prompted to select an image to run.  Use `./run-qemu.sh --help` to see all scrip options.
 
 ### Local Dependencies
+- cargo
 - git
 - docker
 - xhost (for X11 forwarding from the container)

@@ -19,17 +19,19 @@ cleanup() {
 }
 trap cleanup "EXIT"
 
-# missing_dependencies=""
-# for dependency in $HOST_DEPENDENCIES; do
-#     if ! $(which $dependency); then
-#         missing_dependencies+=$dependency
-#     fi
-# done
+# Validate host dependencies
+MISSING_DEPENDENCIES=0
+for dependency in ${HOST_DEPENDENCIES[@]}; do
+    which $dependency 1>/dev/null 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "Missing host dependency: $dependency"
+        MISSING_DEPENDENCIES=1
+    fi
+done
 
-# if $missing_dependencies; then
-#     echo "Missing host dependencies: $missing_dependencies"
-#     exit 1
-# fi
+if [ $MISSING_DEPENDENCIES -ne 0 ]; then
+    exit 1
+fi
 
 BUILD_CONTAINER=0
 START_TELNET=1

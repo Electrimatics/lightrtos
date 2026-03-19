@@ -38,7 +38,7 @@ START_TELNET=1
 START_DEBUG=1
 
 DOCKER_RUN_ARGS=""
-QEMU_RUN_ARGS=""
+QEMU_RUN_ARGS="-d trace:avr_timer16_update_cnt,trace:avr_timer16_interrupt_count"
 
 # Parse options
 while [ $# -gt 0 ]; do
